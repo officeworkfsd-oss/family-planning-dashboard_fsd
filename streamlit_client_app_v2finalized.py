@@ -21,7 +21,8 @@ st.set_page_config(page_title="Client Follow-Up Dashboard (Fixed)", layout="wide
 st.title("Client Follow-Up Dashboard — Excel logic replicated (fixed)")
 st.markdown("Upload your workbook (Admin only) or use the saved server copy. This version improves CNIC matching and follow-up column detection.")
 
-DEFAULT_PATH = "/mnt/data/Client Follow-Up Data.xlsx"
+# ab file project ke andar save hogi
+DEFAULT_PATH = "Client_Follow-Up_Data.xlsx"
 
 # ---------- Helpers ----------
 
