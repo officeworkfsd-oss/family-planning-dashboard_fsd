@@ -5,7 +5,7 @@
 # - More resilient column detection (looks for AX/AY and common keywords)
 # - Fallback UI to let user pick follow-up columns if auto-detection fails
 # - Minor bugfixes for pandas warnings and safe indexing
-# - Integrated Admin vs User logic (upload allowed only in Admin mode)
+# - Integrated Admin vs User logic (upload allowed only in Admin mode, server copy maintained)
 
 import streamlit as st
 import pandas as pd
@@ -14,11 +14,12 @@ from datetime import date
 from dateutil.relativedelta import relativedelta
 import io
 import re
+import os
 
 st.set_page_config(page_title="Client Follow-Up Dashboard (Fixed)", layout="wide")
 
 st.title("Client Follow-Up Dashboard — Excel logic replicated (fixed)")
-st.markdown("Upload your workbook (Admin only) or use the server copy. This version improves CNIC matching and follow-up column detection.")
+st.markdown("Upload your workbook (Admin only) or use the saved server copy. This version improves CNIC matching and follow-up column detection.")
 
 DEFAULT_PATH = "/mnt/data/Client Follow-Up Data.xlsx"
 
@@ -101,41 +102,50 @@ def add_months(dt, months):
 st.sidebar.header("Login Mode")
 password = st.sidebar.text_input("Enter Admin Password:", type="password")
 
-is_admin = (password == "admin123")   # yahan apna password set karo
+is_admin = (password == "admin123")   # apna password set karo
 
 if is_admin:
     st.sidebar.success("✅ Admin Mode Active")
     uploaded = st.file_uploader(
         "Upload Excel workbook (.xlsx)", 
         type=["xlsx"], 
-        key="admin_uploader"   # 👈 unique key
+        key="admin_uploader"
     )
+
+    if uploaded is not None:
+        try:
+            # Save uploaded file as permanent server copy
+            with open(DEFAULT_PATH, "wb") as f:
+                f.write(uploaded.getbuffer())
+            sheets = load_sheets(DEFAULT_PATH)
+            st.success("✅ Workbook uploaded and saved as server copy.")
+        except Exception as e:
+            st.error(f"Failed to save uploaded file: {e}")
+            sheets = {}
+    else:
+        # If no new upload, try loading existing server copy
+        if os.path.exists(DEFAULT_PATH):
+            sheets = load_sheets(DEFAULT_PATH)
+            st.info("Using previously saved server workbook.")
+        else:
+            st.warning("No server workbook found. Please upload a file.")
+            sheets = {}
+
 else:
     st.sidebar.info("👥 User Mode (Upload disabled)")
-    uploaded = None
-
-# ---------- Load workbook ----------
-if uploaded is None:
-    try:
-        sheets = load_sheets(DEFAULT_PATH)
-        st.success(f"Loaded server workbook: {DEFAULT_PATH}")
-    except Exception as e:
-        st.info("No server workbook found. Please ask Admin to upload Excel file.")
-        sheets = {}
-else:
-    try:
-        bio = io.BytesIO(uploaded.getvalue())
-        sheets = load_sheets(bio)
-        st.success("Workbook loaded. Sheets detected: " + ", ".join(sheets.keys()))
-    except Exception as e:
-        st.error(f"Failed to read uploaded file: {e}")
+    if os.path.exists(DEFAULT_PATH):
+        try:
+            sheets = load_sheets(DEFAULT_PATH)
+            st.success("Loaded saved server workbook.")
+        except Exception as e:
+            st.error(f"❌ Error loading saved server workbook: {e}")
+            sheets = {}
+    else:
+        st.error("❌ No server workbook found. Please ask Admin to upload Excel file.")
         sheets = {}
 
 if not sheets:
     st.stop()
-
-# (baaki sara code bilkul wahi hai jaisa aapne bheja tha – sheet detection, CNIC logic, alerts, MWRA info, service/follow-up history, display etc.)
-
 
 # ---------- Let user pick master & follow-up sheets ----------
 st.sidebar.header("Detected sheets")
@@ -157,6 +167,10 @@ follow_name = st.sidebar.selectbox("Follow-up (sheet2) — services", options=li
 
 df_master = sheets[master_name].copy()
 df_follow = sheets[follow_name].copy()
+
+# ---------- Normalize CNIC columns and create normalized cnic fields ----------
+# ... (rest of your CNIC, alert, MWRA info, service/follow-up history, display code remains same as you pasted earlier) ...
+
 
 # ---------- Normalize CNIC columns and create normalized cnic fields ----------
 # detect CNIC column names
