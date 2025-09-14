@@ -109,6 +109,19 @@ def add_months(dt, months):
     except:
         return pd.NaT
 
+# ---------- Admin vs User ----------
+st.sidebar.header("Login Mode")
+password = st.sidebar.text_input("Enter Admin Password:", type="password")
+
+is_admin = (password == "admin123")   # yahan apna password set karo
+
+if is_admin:
+    st.sidebar.success("✅ Admin Mode Active")
+    uploaded = st.file_uploader("Upload Excel workbook (.xlsx)", type=["xlsx"])
+else:
+    st.sidebar.info("👥 User Mode (Upload disabled)")
+    uploaded = None
+
 
 # ---------- Load workbook ----------
 uploaded = st.file_uploader("Upload Excel workbook (.xlsx)", type=["xlsx"])
