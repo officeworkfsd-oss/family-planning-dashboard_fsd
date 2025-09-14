@@ -162,11 +162,20 @@ for name, df in sheets.items():
     if any('service date' in c for c in cols) and possible_follow is None:
         possible_follow = name
 
-master_name = st.sidebar.selectbox("Master (sheet1) — clients", options=list(sheets.keys()), index=list(sheets.keys()).index(possible_master) if possible_master else 0)
-follow_name = st.sidebar.selectbox("Follow-up (sheet2) — services", options=list(sheets.keys()), index=list(sheets.keys()).index(possible_follow) if possible_follow else 0)
+master_name = st.sidebar.selectbox(
+    "Master (sheet1) — clients", 
+    options=list(sheets.keys()), 
+    index=list(sheets.keys()).index(possible_master) if possible_master else 0
+)
+follow_name = st.sidebar.selectbox(
+    "Follow-up (sheet2) — services", 
+    options=list(sheets.keys()), 
+    index=list(sheets.keys()).index(possible_follow) if possible_follow else 0
+)
 
 df_master = sheets[master_name].copy()
 df_follow = sheets[follow_name].copy()
+
 
 # ---------- Normalize CNIC columns and create normalized cnic fields ----------
 # ... (rest of your CNIC, alert, MWRA info, service/follow-up history, display code remains same as you pasted earlier) ...
