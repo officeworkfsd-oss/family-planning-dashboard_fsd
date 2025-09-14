@@ -5,6 +5,7 @@
 # - More resilient column detection (looks for AX/AY and common keywords)
 # - Fallback UI to let user pick follow-up columns if auto-detection fails
 # - Minor bugfixes for pandas warnings and safe indexing
+# - Integrated Admin vs User logic (upload allowed only in Admin mode)
 
 import streamlit as st
 import pandas as pd
@@ -17,22 +18,19 @@ import re
 st.set_page_config(page_title="Client Follow-Up Dashboard (Fixed)", layout="wide")
 
 st.title("Client Follow-Up Dashboard — Excel logic replicated (fixed)")
-st.markdown("Upload your workbook or use the server copy. This version improves CNIC matching and follow-up column detection.")
+st.markdown("Upload your workbook (Admin only) or use the server copy. This version improves CNIC matching and follow-up column detection.")
 
 DEFAULT_PATH = "/mnt/data/Client Follow-Up Data.xlsx"
 
 # ---------- Helpers ----------
 
 def load_sheets(filelike):
-    # Accept either a path string or a bytes-like object (BytesIO / uploaded file)
     try:
         if isinstance(filelike, (str,)):
             x = pd.read_excel(filelike, sheet_name=None)
         else:
-            # filelike may be BytesIO or UploadedFile
             filelike.seek(0)
             x = pd.read_excel(filelike, sheet_name=None)
-        # normalize headers: strip whitespace
         sheets = {}
         for name, df in x.items():
             df = df.copy()
@@ -42,7 +40,6 @@ def load_sheets(filelike):
     except Exception as e:
         raise
 
-
 def find_column(df, keywords, prefer_contains=True):
     if df is None:
         return None
@@ -50,17 +47,14 @@ def find_column(df, keywords, prefer_contains=True):
     lowcols = [str(c).lower() for c in cols]
     for kw in keywords:
         kwl = kw.lower()
-        # exact match first
         for i, c in enumerate(lowcols):
             if c == kwl:
                 return cols[i]
-    # contains match
     for kw in keywords:
         kwl = kw.lower()
         for i, c in enumerate(lowcols):
             if kwl in c:
                 return cols[i]
-    # startswith match
     for kw in keywords:
         kwl = kw.lower()
         for i, c in enumerate(lowcols):
@@ -68,17 +62,13 @@ def find_column(df, keywords, prefer_contains=True):
                 return cols[i]
     return None
 
-
 def normalize_cnic(val):
     if pd.isna(val):
         return ""
     s = str(val)
-    # remove .0 from floats saved as strings
     s = re.sub(r"\.0$", "", s)
-    # remove any non-digit characters (dashes, spaces)
     s = re.sub(r"[^0-9]", "", s)
     return s.strip()
-
 
 def safe_get_first(df, col):
     if col is None or col not in df.columns:
@@ -86,13 +76,11 @@ def safe_get_first(df, col):
     s = df[col].dropna()
     return s.iloc[0] if not s.empty else None
 
-
 def parse_date(x):
     try:
         return pd.to_datetime(x)
     except:
         return pd.NaT
-
 
 def add_months(dt, months):
     if pd.isna(dt):
@@ -117,23 +105,24 @@ is_admin = (password == "admin123")   # yahan apna password set karo
 
 if is_admin:
     st.sidebar.success("✅ Admin Mode Active")
-    uploaded = st.file_uploader("Upload Excel workbook (.xlsx)", type=["xlsx"])
+    uploaded = st.file_uploader(
+        "Upload Excel workbook (.xlsx)", 
+        type=["xlsx"], 
+        key="admin_uploader"   # 👈 unique key
+    )
 else:
     st.sidebar.info("👥 User Mode (Upload disabled)")
     uploaded = None
 
-
 # ---------- Load workbook ----------
-uploaded = st.file_uploader("Upload Excel workbook (.xlsx)", type=["xlsx"])
 if uploaded is None:
     try:
         sheets = load_sheets(DEFAULT_PATH)
         st.success(f"Loaded server workbook: {DEFAULT_PATH}")
     except Exception as e:
-        st.info("No server workbook found. Please upload your Excel file.")
+        st.info("No server workbook found. Please ask Admin to upload Excel file.")
         sheets = {}
 else:
-    # UploadedFile has .getvalue(); create BytesIO
     try:
         bio = io.BytesIO(uploaded.getvalue())
         sheets = load_sheets(bio)
@@ -144,6 +133,9 @@ else:
 
 if not sheets:
     st.stop()
+
+# (baaki sara code bilkul wahi hai jaisa aapne bheja tha – sheet detection, CNIC logic, alerts, MWRA info, service/follow-up history, display etc.)
+
 
 # ---------- Let user pick master & follow-up sheets ----------
 st.sidebar.header("Detected sheets")
