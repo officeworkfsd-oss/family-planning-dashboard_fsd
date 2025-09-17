@@ -99,6 +99,20 @@ def add_months(dt, months):
     except:
         return pd.NaT
 
+def normalize_phone(val):
+    """Ensure phone is 11-digit string like 03001234567"""
+    if pd.isna(val):
+        return "-"
+    s = str(val).strip()
+    s = re.sub(r"\.0$", "", s)  # remove trailing .0
+    s = re.sub(r"\D", "", s)    # keep only digits
+    if len(s) == 11:
+        return s
+    elif len(s) > 11:
+        return s[-11:]  # take last 11 digits (in case country code included)
+    else:
+        return s  # return as-is if shorter
+
 # ---------- Admin vs User ----------
 st.sidebar.header("Login Mode")
 password = st.sidebar.text_input("Enter Admin Password:", type="password")
@@ -215,7 +229,9 @@ master_cols = {
     'cnic': master_cnic_col,
     'name': find_column(df_master, ['Name','name','Client Name','Full Name']),
     'address': find_column(df_master, ['Address','ADDRESS','Home Address']),
-    'phone': find_column(df_master, ['Phone','Phone NO','MOBILE','Mobile','Mobile_NO','Contact'])
+    'phone': find_column(df_master, ['Phone','Phone NO','MOBILE','Mobile','Mobile_NO','Contact']),
+    'age': find_column(df_master, ['Age','AGE','DOB','Date of Birth']),
+    'marital': find_column(df_master, ['Marital Status','Marital','Marital_Status'])  # <-- new
 }
 
 follow_cols = {
@@ -226,6 +242,8 @@ follow_cols = {
     'provider': find_column(df_follow, ['Provider','Clinic','Provider /Clinic Name','Provider / Clinic Name','Clinic Name']),
     'method_visit1': find_column(df_follow, ['Method Provided on First Visit','Method Visit 1','Method Provided','Method','B17']),
     'service_date_1': find_column(df_follow, ['Service Date','Service Date 1','Service Date .1']),
+    'fp_user': find_column(df_follow, ["Client Type", "FP User", "User Status"]),
+    'marital': find_column(df_follow, ["Marital", "Marital Status", "Status"]),    # <-- new
     # follow-up columns - try keywords, visit-specific headers and also column-letters AX/AY
     'follow_service_1': find_column(df_follow, [
         'Follow-Up Service','Follow Up Service','1st Follow-Up Service',
@@ -240,7 +258,7 @@ follow_cols = {
     'service_date_2': find_column(df_follow, ['Service Date .1','Service Date 2']),
     'service_date_3': find_column(df_follow, ['Service Date .2','Service Date 3']),
     'service_date_4': find_column(df_follow, ['Service Date .3','Service Date 4']),
-    'service_date_5': find_column(df_follow, ['Service Date .4','Service Date 5'])
+    'service_date_5': find_column(df_follow, ['Service Date .4','Service Date 5']),
 }
 
 # If follow-up columns still not found, allow user to pick them manually from sidebar (helpful for AX/AY etc.)
@@ -257,12 +275,12 @@ if follow_cols['follow_service_date_1'] is None:
         follow_cols['follow_service_date_1'] = picked
 
 # ---------- UI: CNIC input ----------
-st.subheader("Dashboard (enter CNIC)")
+st.subheader("Dashboard (Enter CNIC)")
 # use session state so button can set value
 if 'cnic_input' not in st.session_state:
     st.session_state['cnic_input'] = ""
 
-cnic_input = st.text_input("Search CNIC (editable):", value=st.session_state['cnic_input'], key='cnic_widget')
+cnic_input = st.text_input("Search CNIC:", value=st.session_state['cnic_input'], key='cnic_widget')
 if st.button("Pick example CNIC from follow-up"):
     # pick first non-empty normalized CNIC from follow sheet if available else master
     ex = ""
@@ -351,52 +369,67 @@ else:
     else:
         alert_msg = ""
 
+# --- same imports, helpers, admin/user logic as in your fixed code above ---
+# (no change till MWRA Information section)
+
 # ---------- MWRA Information ----------
 mwra_name = ""
 mwra_cnic = ""
 mwra_phone = ""
 mwra_address = ""
 mwra_fpc = ""
+mwra_age = ""
+mwra_marital = ""
+mwra_fp_user = ""
+mwra_reg_date = ""
+marital_status = ""
 
 if bisp_status == "NO":
     mwra_name = mwra_cnic = mwra_phone = mwra_address = mwra_fpc = "-"
+    mwra_age = mwra_marital = mwra_fp_user = mwra_reg_date = "-"
 else:
-    if bisp_status == "YES" and reg_status == "Not Registered":
-        if master_cols['cnic']:
-            row = df_master[df_master['__cnic_norm'] == cnic]
-            if not row.empty:
-                mwra_name = row[master_cols['name']].astype(str).iloc[0] if master_cols['name'] in row.columns else ""
-                mwra_cnic = row[master_cols['cnic']].astype(str).iloc[0] if master_cols['cnic'] in row.columns else cnic
-                mwra_phone = row[master_cols['phone']].astype(str).iloc[0] if master_cols['phone'] in row.columns else ""
-                mwra_address = row[master_cols['address']].astype(str).iloc[0] if master_cols['address'] in row.columns else ""
-    elif bisp_status == "YES" and reg_status == "Registered":
-        if not follow_rows.empty:
-            name_col = find_column(df_follow, ['Name','Name of Client','Client Name'])
-            if name_col and name_col in follow_rows.columns:
-                mwra_name = safe_get_first(follow_rows, name_col) or ""
-            mwra_cnic = cnic
-            phone_col = find_column(df_follow, ['MOBILE','Phone','Mobile','MOBILE_NO','MOBILE_NO','Contact'])
-            if phone_col:
-                mwra_phone = safe_get_first(follow_rows, phone_col) or ""
-            addr_col = find_column(df_follow, ['Address','ADDRESS','Home Address'])
-            if addr_col:
-                mwra_address = safe_get_first(follow_rows, addr_col) or ""
-            if follow_cols['fpc_name']:
-                mwra_fpc = safe_get_first(follow_rows, follow_cols['fpc_name']) or ""
-        else:
-            if master_cols['cnic']:
-                row = df_master[df_master['__cnic_norm'] == cnic]
-                if not row.empty:
-                    mwra_name = row[master_cols['name']].astype(str).iloc[0] if master_cols['name'] in row.columns else ""
-                    mwra_cnic = row[master_cols['cnic']].astype(str).iloc[0] if master_cols['cnic'] in row.columns else cnic
-                    mwra_phone = row[master_cols['phone']].astype(str).iloc[0] if master_cols['phone'] in row.columns else ""
-                    mwra_address = row[master_cols['address']].astype(str).iloc[0] if master_cols['address'] in row.columns else ""
+    # From Master (Sheet1)
+    row_master = df_master[df_master['__cnic_norm'] == cnic]
+    if not row_master.empty:
+        r1 = row_master.iloc[0]
+        mwra_name = str(r1.get(master_cols['name'], "-"))
+        mwra_cnic = str(r1.get(master_cols['cnic'], cnic))
+        mwra_phone = normalize_phone(r1.get(master_cols['phone'], "-"))
+        mwra_address = str(r1.get(master_cols['address'], "-"))
+        marital_status = str(r1.get(master_cols['marital'], "-"))
 
-if reg_status == "Registered":
-    if follow_cols['fpc_name'] and not follow_rows.empty:
-        mwra_fpc = safe_get_first(follow_rows, follow_cols['fpc_name']) or ""
-elif reg_status == "Not Registered":
-    mwra_fpc = "-"
+        # DOB se Age calculate
+        dob_raw = r1.get(master_cols['age'], "-")   # actually DOB values hain
+        dob = parse_date(dob_raw)
+        if pd.notna(dob):
+            today = pd.to_datetime("today")
+            mwra_age = str(int((today - dob).days / 365.25))
+        else:
+            mwra_age = "-"
+
+        # ✅ Marital Status fix (sirf Sheet1 se)
+        marital_col_master = find_column(df_master, ['Marital Status','Married','Status'])
+        if marital_col_master and marital_col_master in row_master.index:
+            mwra_marital = str(r1[marital_col_master])
+        else:
+            mwra_marital = "-"
+
+    # From Follow-ups (Sheet2) — only FPC, FP User, Registration Date
+    row_fu = df_follow[df_follow['__cnic_norm'] == cnic]
+    fpc_col = follow_cols.get('fpc_name')
+    reg_col = follow_cols.get('date_of_registration')
+    fp_user_col = follow_cols.get('fp_user')
+
+    if not row_fu.empty:
+        r2 = row_fu.iloc[0]
+        mwra_fpc = str(r2.get(fpc_col, "-")) if fpc_col else "-"
+        mwra_reg_date = r2.get(reg_col, "-") if reg_col else "-"
+        mwra_fp_user = str(r2.get(fp_user_col, "-")) if fp_user_col else "-"
+    else:
+        mwra_fpc = "-"
+        mwra_reg_date = "-"
+        mwra_fp_user = "-"
+
 
 # ---------- Service History ----------
 service_availed = ""
@@ -438,11 +471,7 @@ fu_service_1 = ""
 fu_service_date_1 = pd.NaT
 fu_due_2 = ""
 
-# follow-up logic follows Excel formulas:
-# IF(AND(B4="YES",B5="Registered"), INDEX(Sheet2!AX:AX, MATCH(B3, Sheet2!P:P,0)), "")
-# and date similarly from AY, then EDATE(date,3) for 2nd due date
-if bisp_status == "YES" and reg_status == "Registered" and not follow_rows.empty:
-    # attempt to detect the AX-equivalent column (method provided on n-th visit)
+if bisp_status == "YES" and reg_status == "Registered":
     fu_col = follow_cols.get('follow_service_1') or find_column(df_follow, [
         'Method Provided on 4th Visit',
         'Method Provided on 4th Visit (Aug-Follow Up)',
@@ -452,31 +481,38 @@ if bisp_status == "YES" and reg_status == "Registered" and not follow_rows.empty
         'AX',
         'ax'
     ])
-    # attempt to detect the AY-equivalent column (service date for that visit)
-    fu_date_col = follow_cols.get('follow_service_date_1') or find_column(df_follow, [
-        'Service Date .3',
-        '4th Visit Service Date',
-        'Service Date',
-        'Follow-Up Service Date',
-        'AY',
-        'ay'
-    ])
 
-    if fu_col and fu_col in follow_rows.columns:
+    if fu_col and fu_col in follow_rows.columns and not follow_rows.empty:
         fu_service_1 = safe_get_first(follow_rows, fu_col) or ""
-    if fu_date_col and fu_date_col in follow_rows.columns:
-        fu_service_date_1 = parse_date(safe_get_first(follow_rows, fu_date_col))
 
-    # compute 2nd follow-up due date by adding 3 months to 1st FU service date
-    if pd.notna(fu_service_date_1):
-        fu_due_2 = add_months(fu_service_date_1, 3)
-        fu_due_2 = fu_due_2.date().isoformat() if pd.notna(fu_due_2) else ""
-    else:
+    # ✅ IUCD case: koi follow-up na ho
+    if service_availed.strip().upper().startswith("IUCD"):
+        fu_service_date_1 = pd.NaT
         fu_due_2 = ""
+    else:
+        if pd.notna(service_date):
+            # 👉 Service History ka Follow-Up Due Date
+            service_fu_due = add_months(service_date, 3)
+
+            if pd.notna(service_fu_due):
+                # 👉 Follow-Up History ka 1st Follow-Up Service Date
+                fu_service_date_1 = service_fu_due
+
+                # 👉 Follow-Up History ka 2nd Follow-Up Due Date = 1st + 3 months
+                fu_due_2 = add_months(fu_service_date_1, 3)
+                fu_due_2 = fu_due_2.date().isoformat()
+            else:
+                fu_service_date_1 = pd.NaT
+                fu_due_2 = ""
+        else:
+            fu_service_date_1 = pd.NaT
+            fu_due_2 = ""
 else:
     fu_service_1 = ""
     fu_service_date_1 = pd.NaT
     fu_due_2 = ""
+
+
 
 # ---------- Display (mimic your Dashboard layout) ----------
 st.markdown("### Summary")
@@ -495,7 +531,11 @@ info_table = {
     "CNIC": [mwra_cnic],
     "Phone NO.": [mwra_phone],
     "Address": [mwra_address],
-    "FPC Name": [mwra_fpc]
+    "Age": [mwra_age],
+    "Marital Status": [mwra_marital],
+    "FP User (Current/Ever/Never)": [mwra_fp_user],
+    "FPC Name": [mwra_fpc],
+    "Registration Date": [mwra_reg_date]
 }
 info_df = pd.DataFrame(info_table)
 st.dataframe(info_df.T, use_container_width=True)
