@@ -379,10 +379,9 @@ mwra_phone = ""
 mwra_address = ""
 mwra_fpc = ""
 mwra_age = ""
-mwra_marital = ""
+mwra_marital = ""   # ✅ sirf ye use karna hai
 mwra_fp_user = ""
 mwra_reg_date = ""
-marital_status = ""
 
 if bisp_status == "NO":
     mwra_name = mwra_cnic = mwra_phone = mwra_address = mwra_fpc = "-"
@@ -396,23 +395,18 @@ else:
         mwra_cnic = str(r1.get(master_cols['cnic'], cnic))
         mwra_phone = normalize_phone(r1.get(master_cols['phone'], "-"))
         mwra_address = str(r1.get(master_cols['address'], "-"))
-        marital_status = str(r1.get(master_cols['marital'], "-"))
+
+        # ✅ Marital Status direct set
+        mwra_marital = str(r1.get(master_cols['marital'], "-"))
 
         # DOB se Age calculate
-        dob_raw = r1.get(master_cols['age'], "-")   # actually DOB values hain
+        dob_raw = r1.get(master_cols['age'], "-")
         dob = parse_date(dob_raw)
         if pd.notna(dob):
             today = pd.to_datetime("today")
             mwra_age = str(int((today - dob).days / 365.25))
         else:
             mwra_age = "-"
-
-        # ✅ Marital Status fix (sirf Sheet1 se)
-        marital_col_master = find_column(df_master, ['Marital Status','Married','Status'])
-        if marital_col_master and marital_col_master in row_master.index:
-            mwra_marital = str(r1[marital_col_master])
-        else:
-            mwra_marital = "-"
 
     # From Follow-ups (Sheet2) — only FPC, FP User, Registration Date
     row_fu = df_follow[df_follow['__cnic_norm'] == cnic]
