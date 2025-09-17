@@ -16,10 +16,96 @@ import io
 import re
 import os
 
+# 🌿 Custom Theme Styling
+st.markdown(
+    """
+    <style>
+    /* Background Gradient */
+    .stApp {
+        background: linear-gradient(135deg, #004d40, #26a69a);
+        color: #1b1b1b;
+    }
+
+    /* Headers with shadow */
+    h1, h2, h3, h4 {
+        color: black !important;
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        font-weight: bold;
+    }
+
+    /* Sidebar text black */
+    section[data-testid="stSidebar"] {
+        color: black !important;
+    }
+    section[data-testid="stSidebar"] * {
+        color: black !important;
+    }
+
+/* Card Style */
+.card {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 16px;
+    box-shadow: 0px 4px 12px rgba(0,0,0,0.15);
+    margin-bottom: 1.5rem;
+}
+
+    /* Card Header */
+    .card h2, .card h3 {
+        color: black !important;
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.25);
+        margin-top: 0;
+        margin-bottom: 1rem;
+        font-weight: 700;
+    }
+
+    /* Dataframes */
+    .stDataFrame, .stTable {
+        background: white !important;
+        border-radius: 12px;
+        padding: 0.5rem;
+        box-shadow: 0px 2px 8px rgba(0,0,0,0.1);
+    }
+
+    /* Alert Box */
+    .stAlert {
+        background-color: #fff3cd !important;
+        color: #856404 !important;
+        border: 1px solid #ffeeba !important;
+        border-radius: 8px;
+        font-weight: 600;
+    }
+
+    /* Buttons */
+    div.stDownloadButton > button, div.stButton > button {
+        background-color: #00695c;
+        color: white;
+        border-radius: 10px;
+        border: none;
+        padding: 0.6rem 1.2rem;
+        font-weight: 600;
+        transition: 0.3s;
+    }
+    div.stDownloadButton > button:hover, div.stButton > button:hover {
+        background-color: #004d40;
+        transform: scale(1.05);
+    }
+
+    /* Icons */
+    [class^="stIcon"] {
+        color: teal !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+
+
 st.set_page_config(page_title="Client Follow-Up Dashboard (Fixed)", layout="wide")
 
-st.title("Individual Client Search")
-st.markdown("Upload your workbook (Admin only) or use the saved server copy. This version improves CNIC matching and follow-up column detection.")
+st.title("Individual Client Search 👤")
+st.markdown("")
 
 # ab file project ke andar save hogi
 DEFAULT_PATH = "Client_Follow-Up_Data.xlsx"
@@ -275,22 +361,12 @@ if follow_cols['follow_service_date_1'] is None:
         follow_cols['follow_service_date_1'] = picked
 
 # ---------- UI: CNIC input ----------
-st.subheader("Dashboard (Enter CNIC)")
+st.subheader("Enter CNIC to Search 👇")
 # use session state so button can set value
 if 'cnic_input' not in st.session_state:
     st.session_state['cnic_input'] = ""
 
 cnic_input = st.text_input("Search CNIC:", value=st.session_state['cnic_input'], key='cnic_widget')
-if st.button("Pick example CNIC from follow-up"):
-    # pick first non-empty normalized CNIC from follow sheet if available else master
-    ex = ""
-    if '__cnic_norm' in df_follow.columns and df_follow['__cnic_norm'].astype(str).str.strip().ne('').any():
-        ex = df_follow.loc[df_follow['__cnic_norm'].astype(str).str.strip() != '', '__cnic_norm'].iloc[0]
-    elif '__cnic_norm' in df_master.columns and df_master['__cnic_norm'].astype(str).str.strip().ne('').any():
-        ex = df_master.loc[df_master['__cnic_norm'].astype(str).str.strip() != '', '__cnic_norm'].iloc[0]
-    if ex:
-        st.session_state['cnic_input'] = ex
-        st.experimental_rerun()
 
 if not cnic_input:
     st.info("Enter CNIC to compute Dashboard values (BISP, Registration, Alerts, MWRA info, Service & Follow-up history).")
@@ -509,6 +585,7 @@ else:
 
 
 # ---------- Display (mimic your Dashboard layout) ----------
+
 st.markdown("### Summary")
 cols = st.columns([2,2,2,4])
 cols[0].write("**BISP Beneficiaries**")
@@ -552,7 +629,7 @@ fu_table = {
 st.table(pd.DataFrame(fu_table))
 
 st.markdown("---")
-st.write("### Raw follow-up rows matched (from follow-up sheet):")
+st.write("### MWRA Detailed Information:")
 if not follow_rows.empty:
     st.dataframe(follow_rows)
     st.download_button("Download matched follow-up rows as CSV", data=follow_rows.to_csv(index=False).encode('utf-8'), file_name=f"{cnic}_followups.csv", mime='text/csv')
